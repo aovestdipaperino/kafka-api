@@ -68,7 +68,7 @@ impl Debug for ByteBufferRecords {
 }
 
 impl ByteBufferRecords {
-    pub(super) fn new(buf: ByteBuffer) -> ByteBufferRecords {
+    pub fn new(buf: ByteBuffer) -> ByteBufferRecords {
         let batches = OnceCell::new();
         ByteBufferRecords { buf, batches }
     }
