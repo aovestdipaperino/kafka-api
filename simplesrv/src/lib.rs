@@ -513,6 +513,14 @@ impl Broker {
         }
     }
 
+    fn is_leader(&self, group_id: &str, member_id: &str) -> bool {
+        self.group_coordinator
+            .groups
+            .get(group_id)
+            .map(|group| group.leader_id.as_deref() == Some(member_id) || group.leader_id.is_none())
+            .unwrap_or(false)
+    }
+
     fn receive_sync_group(&mut self, request: SyncGroupRequest) -> SyncGroupResponse {
         let assignments = request
             .assignments
@@ -520,19 +528,33 @@ impl Broker {
             .cloned()
             .map(|assign| (assign.member_id, assign.assignment))
             .collect::<BTreeMap<String, ByteBuffer>>();
-        let group = self
-            .group_coordinator
-            .groups
-            .get_mut(&request.group_id)
-            .unwrap();
-        group.sync(assignments);
 
-        let member = group.members.get(&request.member_id).unwrap();
+        let assignment = if self.is_leader(&request.group_id, &request.member_id) {
+            warn!("leader sync group");
+            let group = self
+                .group_coordinator
+                .groups
+                .get_mut(&request.group_id)
+                .unwrap();
+            group.sync(assignments);
+            let member = group.members.get(&request.member_id).unwrap();
+
+            member.assignment.clone()
+        } else {
+            let group = self
+                .group_coordinator
+                .groups
+                .get(&request.group_id)
+                .unwrap();
+            let leader = group.leader_id.as_deref().unwrap();
+            let leader = group.members.get(leader).unwrap();
+            leader.assignment.clone()
+        };
 
         SyncGroupResponse {
             protocol_type: request.protocol_type.clone(),
             protocol_name: request.protocol_name.clone(),
-            assignment: member.assignment.clone(),
+            assignment,
             ..Default::default()
         }
     }
