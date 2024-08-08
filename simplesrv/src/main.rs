@@ -27,7 +27,7 @@ use tracing::{debug, error, error_span, info, Level};
 
 fn main() -> io::Result<()> {
     tracing_subscriber::fmt()
-        .with_max_level(Level::TRACE)
+        .with_max_level(Level::WARN)
         .init();
 
     let addr: SocketAddr = "127.0.0.1:9092".parse().unwrap();
@@ -79,11 +79,9 @@ fn dispatch(mut socket: TcpStream, broker: Arc<Mutex<Broker>>) -> io::Result<()>
             i32::from_be_bytes(buf) as usize
         };
 
-        let mut buf = {
-            let mut buf = vec![0u8; n];
-            socket.read_exact(&mut buf)?;
-            ByteBuffer::new(buf)
-        };
+        let mut bytes = vec![0u8; n];
+        socket.read_exact(&mut bytes)?;
+        let mut buf = ByteBuffer::new(bytes);
 
         let (header, request) = Request::decode(&mut buf)?;
         assert!(!buf.has_remaining(), "remaining bytes unparsed");

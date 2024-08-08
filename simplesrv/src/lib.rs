@@ -51,7 +51,7 @@ use kafka_api::{
     sync_group_response::SyncGroupResponse,
     Request, Response,
 };
-use tracing::{debug, trace};
+use tracing::{debug, trace, warn};
 
 #[derive(Debug, Clone)]
 pub struct ClientInfo {
@@ -281,6 +281,7 @@ impl Broker {
     }
 
     fn receive_metadata(&mut self, _request: MetadataRequest) -> MetadataResponse {
+        self.purge_expired_batches();
         let brokers = self
             .cluster_meta
             .brokers
@@ -537,6 +538,7 @@ impl Broker {
     }
 
     fn receive_offset_fetch(&mut self, request: OffsetFetchRequest) -> OffsetFetchResponse {
+        self.purge_expired_batches();
         let mut groups = vec![];
         for group in request.groups.iter() {
             let mut topics = vec![];
@@ -568,8 +570,28 @@ impl Broker {
         }
     }
 
+    pub fn purge_expired_batches(&mut self) {
+        let now = chrono::Utc::now().timestamp_millis();
+        for ((_, _), (_, batches)) in self.topic_partition_store.iter_mut() {
+            let original_len = batches.len();
+            batches.retain(|r| {
+                for batch in r.batches() {
+                    if batch.expiration < now {
+                        return false;
+                    }
+                }
+                true
+            });
+            let purged = original_len - batches.len();
+            if purged > 0 {
+                warn!("purged {} batches from partition", purged)
+            }
+        }
+    }
+
     fn receive_fetch(&mut self, request: FetchRequest) -> FetchResponse {
         let mut responses = vec![];
+        self.purge_expired_batches();
         for topic in request.topics.iter() {
             let topic_id = self
                 .topics
