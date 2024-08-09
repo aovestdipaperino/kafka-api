@@ -34,6 +34,8 @@ pub mod find_coordinator_request;
 pub mod find_coordinator_response;
 pub mod init_producer_id_request;
 pub mod init_producer_id_response;
+pub mod heartbeat_request;
+pub mod heartbeat_response;
 pub mod join_group_request;
 pub mod join_group_response;
 pub mod metadata_request;
@@ -47,12 +49,14 @@ pub mod response_header;
 pub mod sync_group_request;
 pub mod sync_group_response;
 
+
 #[derive(Debug)]
 pub enum Request {
     ApiVersionsRequest(api_versions_request::ApiVersionsRequest),
     CreateTopicRequest(create_topic_request::CreateTopicsRequest),
     FetchRequest(fetch_request::FetchRequest),
     FindCoordinatorRequest(find_coordinator_request::FindCoordinatorRequest),
+    HeartbeatRequest(heartbeat_request::HeartbeatRequest),
     InitProducerIdRequest(init_producer_id_request::InitProducerIdRequest),
     JoinGroupRequest(join_group_request::JoinGroupRequest),
     MetadataRequest(metadata_request::MetadataRequest),
@@ -90,6 +94,10 @@ impl Request {
                 find_coordinator_request::FindCoordinatorRequest::read(buf, api_version)
                     .map(Request::FindCoordinatorRequest)
             }
+            ApiMessageType::HEARTBEAT => {
+                heartbeat_request::HeartbeatRequest::read(buf, api_version)
+                    .map(Request::HeartbeatRequest)
+            }
             ApiMessageType::INIT_PRODUCER_ID => {
                 init_producer_id_request::InitProducerIdRequest::read(buf, api_version)
                     .map(Request::InitProducerIdRequest)
@@ -124,6 +132,7 @@ pub enum Response {
     CreateTopicsResponse(create_topic_response::CreateTopicsResponse),
     FindCoordinatorResponse(find_coordinator_response::FindCoordinatorResponse),
     FetchResponse(fetch_response::FetchResponse),
+    HeartbeatResponse(heartbeat_response::HeartbeatResponse),
     InitProducerIdResponse(init_producer_id_response::InitProducerIdResponse),
     JoinGroupResponse(join_group_response::JoinGroupResponse),
     MetadataResponse(metadata_response::MetadataResponse),
@@ -162,6 +171,7 @@ impl Response {
             Response::CreateTopicsResponse(resp) => resp.calculate_size(version),
             Response::FindCoordinatorResponse(resp) => resp.calculate_size(version),
             Response::FetchResponse(resp) => resp.calculate_size(version),
+            Response::HeartbeatResponse(resp) => resp.calculate_size(version),
             Response::InitProducerIdResponse(resp) => resp.calculate_size(version),
             Response::JoinGroupResponse(resp) => resp.calculate_size(version),
             Response::MetadataResponse(resp) => resp.calculate_size(version),
@@ -177,6 +187,7 @@ impl Response {
             Response::CreateTopicsResponse(resp) => resp.write(buf, version)?,
             Response::FindCoordinatorResponse(resp) => resp.write(buf, version)?,
             Response::FetchResponse(resp) => resp.write(buf, version)?,
+            Response::HeartbeatResponse(resp) => resp.write(buf, version)?,
             Response::InitProducerIdResponse(resp) => resp.write(buf, version)?,
             Response::JoinGroupResponse(resp) => resp.write(buf, version)?,
             Response::MetadataResponse(resp) => resp.write(buf, version)?,
