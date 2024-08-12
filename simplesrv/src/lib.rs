@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use std::{
-    cmp::max,
     collections::{btree_map::Entry, BTreeMap, BTreeSet},
     sync::atomic::{AtomicI64, Ordering},
 };
@@ -51,7 +50,7 @@ use kafka_api::{
     sync_group_response::SyncGroupResponse,
     Request, Response,
 };
-use tracing::{debug, trace, warn};
+use tracing::{debug, error, trace, warn};
 
 #[derive(Debug, Clone)]
 pub struct ClientInfo {
@@ -241,6 +240,7 @@ impl Broker {
             Request::MetadataRequest(request) => {
                 Response::MetadataResponse(self.receive_metadata(request))
             }
+            Request::HeartbeatRequest(_) => Response::HeartbeatResponse(Default::default()),
             Request::InitProducerIdRequest(request) => {
                 Response::InitProducerIdResponse(self.receive_init_producer(request))
             }
@@ -333,7 +333,7 @@ impl Broker {
         for topic in request.topics.iter() {
             let topic_id = uuid::Uuid::new_v4();
             let topic_name = topic.name.clone();
-            let num_partitions = max(topic.num_partitions, 1);
+            let num_partitions = 8; // max(topic.num_partitions, 1);
 
             let mut partitions = BTreeMap::new();
             for idx in 0..num_partitions {
@@ -375,6 +375,7 @@ impl Broker {
     }
 
     fn receive_produce(&mut self, request: ProduceRequest) -> ProduceResponse {
+        self.purge_expired_batches();
         let mut responses = vec![];
         for topic in request.topic_data {
             let topic_name = topic.name.clone();
@@ -470,6 +471,7 @@ impl Broker {
             request.member_id
         };
 
+        warn!("JOINGROUP: group_id: {}, member_id: {}", group_id, member_id);
         let member = MemberMeta {
             group_id,
             member_id: member_id.clone(),
@@ -514,14 +516,50 @@ impl Broker {
     }
 
     fn is_leader(&self, group_id: &str, member_id: &str) -> bool {
-        self.group_coordinator
+        let group = self.group_coordinator
             .groups
-            .get(group_id)
-            .map(|group| group.leader_id.as_deref() == Some(member_id) || group.leader_id.is_none())
-            .unwrap_or(false)
+            .get(group_id);
+
+        if group.is_none() {
+            // maybe we should panic here
+            error!("No group found for group_id: {}", group_id);
+            return false;
+        };
+
+        let group = group.unwrap();
+        if group.leader_id.is_none() {
+            // there is no leader yet, promote to leader
+            warn!("No leader, promoting?");
+            return true;
+        }
+        let leader = group.leader_id.clone().unwrap();
+        if leader == member_id {
+            warn!("The member is the leader");
+            return true;
+        }
+        let leader = group.members.get(&leader);
+        if leader.is_none() {
+            // maybe we should panic here
+            error!("No leader found for group_id: {}. Promoting.", group_id);
+            return true;
+        }
+
+        let leader = leader.unwrap();
+        let member = group.members.get(member_id).expect("member not found");
+
+        if leader.assignment.is_empty() {
+            warn!("Leader has empty assignment, promoting");
+            return true;
+        }
+        warn!("is_leader is returning false, leader assignment size: {} member assignment size: {}"
+            ,leader.assignment.len()
+            ,member.assignment.len()
+        );
+        false
     }
 
     fn receive_sync_group(&mut self, request: SyncGroupRequest) -> SyncGroupResponse {
+        self.purge_expired_batches();
         let assignments = request
             .assignments
             .iter()
@@ -530,15 +568,24 @@ impl Broker {
             .collect::<BTreeMap<String, ByteBuffer>>();
 
         let assignment = if self.is_leader(&request.group_id, &request.member_id) {
-            warn!("leader sync group");
+
             let group = self
                 .group_coordinator
                 .groups
                 .get_mut(&request.group_id)
                 .unwrap();
             group.sync(assignments);
-            let member = group.members.get(&request.member_id).unwrap();
+            let member = group.members.get_mut(&request.member_id).unwrap();
+            if !request.assignments.is_empty() {
+                warn!("setting member assignment from request");
+                if request.assignments.len() > 1 {
+                    error!("More than one assignment!");
+                }
+                member.assignment = request.assignments[0].assignment.clone();
+            }
 
+            warn!("promoted sync group, size: {}, request assignment length: {}"
+                , member.assignment.len(), request.assignments.len());
             member.assignment.clone()
         } else {
             let group = self
@@ -548,9 +595,10 @@ impl Broker {
                 .unwrap();
             let leader = group.leader_id.as_deref().unwrap();
             let leader = group.members.get(leader).unwrap();
+            warn!("non-promoted sync group, size: {}", leader.assignment.len());
             leader.assignment.clone()
         };
-
+        warn!("Returned assignment size: {}", assignment.len());
         SyncGroupResponse {
             protocol_type: request.protocol_type.clone(),
             protocol_name: request.protocol_name.clone(),

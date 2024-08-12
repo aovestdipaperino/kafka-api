@@ -21,16 +21,17 @@ use std::{
 };
 
 use bytes::Buf;
+use log::warn;
 use kafka_api::{bytebuffer::ByteBuffer, sendable::SendBuilder, Request};
 use simplesrv::{Broker, BrokerMeta, ClientInfo, ClusterMeta};
-use tracing::{debug, error, error_span, info, Level};
+use tracing::{error, error_span, info, Level};
 
 fn main() -> io::Result<()> {
     tracing_subscriber::fmt()
         .with_max_level(Level::WARN)
         .init();
 
-    let addr: SocketAddr = "127.0.0.1:9092".parse().unwrap();
+    let addr: SocketAddr = "127.0.0.1:3030".parse().unwrap();
     let listener = TcpListener::bind(addr)?;
     info!("Starting Kafka Simple Server at {}", addr);
 
@@ -84,8 +85,9 @@ fn dispatch(mut socket: TcpStream, broker: Arc<Mutex<Broker>>) -> io::Result<()>
         let mut buf = ByteBuffer::new(bytes);
 
         let (header, request) = Request::decode(&mut buf)?;
+
         assert!(!buf.has_remaining(), "remaining bytes unparsed");
-        debug!("Receive request {request:?}");
+        warn!("Receive request {request:?}");
 
         let response = {
             let client_info = ClientInfo {
