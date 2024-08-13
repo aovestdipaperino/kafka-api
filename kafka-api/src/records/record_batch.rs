@@ -175,7 +175,13 @@ impl RecordBatch {
     }
 
     pub fn set_last_offset(&mut self, offset: i64) {
-        self.last_offset_delta = offset - self.base_offset;
+        /*
+                let base_offset = offset - self.last_offset_delta() as i64;
+        self.buf
+            .mut_slice_in(BASE_OFFSET_OFFSET..)
+            .put_i64(base_offset);
+         */
+        self.base_offset = offset - self.last_offset_delta;
     }
 
     pub fn last_offset(&self) -> i64 {
