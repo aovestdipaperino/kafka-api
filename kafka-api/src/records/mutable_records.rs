@@ -16,10 +16,11 @@ use std::{
     cell::OnceCell,
     fmt::{Debug, Formatter},
 };
-
+use bytes::BufMut;
 use tracing::warn;
 
 use crate::{bytebuffer::ByteBuffer, records::*};
+use crate::records::{ByteBuffer as BB, ByteBufferRecords};
 
 #[derive(Default)]
 pub struct MutableRecords {
@@ -61,7 +62,16 @@ impl MutableRecords {
     }
 
     pub fn freeze(self) -> ReadOnlyRecords {
-        ReadOnlyRecords::ByteBuffer(ByteBufferRecords::new(self.buf))
+        // Create a new buffer here.
+        let mut buf = bytes::BytesMut::new();
+        let records = self.batches.get().expect("Should be set");
+        //buf.put_i32(records.len() as i32);
+
+        for record_batch in records {
+            record_batch.encode(& mut buf);
+        }
+
+        ReadOnlyRecords::ByteBuffer(ByteBufferRecords::new(BB::new(buf.to_vec())))
     }
 
     pub fn as_bytes(&self) -> &[u8] {

@@ -87,7 +87,7 @@ fn dispatch(mut socket: TcpStream, broker: Arc<Mutex<Broker>>) -> io::Result<()>
         let (header, request) = Request::decode(&mut buf)?;
 
         assert!(!buf.has_remaining(), "remaining bytes unparsed");
-        warn!("Receive request {request:?}");
+        info!("Receive request {request:?}");
 
         let response = {
             let client_info = ClientInfo {

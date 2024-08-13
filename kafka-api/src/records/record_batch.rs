@@ -13,32 +13,43 @@
 // limitations under the License.
 
 use std::fmt::{Debug, Formatter};
-
-use bytes::{Buf, BufMut};
-
+use std::io::Write;
+use bytes::{Buf, BufMut, BytesMut};
+use crc::Crc;
+use tracing::error;
+use uuid::Bytes;
 use crate::{
     bytebuffer::ByteBuffer,
     codec::{Decoder, RecordList},
     records::*,
 };
+use crate::codec::Encoder;
+use crate::sendable::SendBuilder;
 
 #[derive(Default)]
 pub struct RecordBatch {
-    pub(super) buf: ByteBuffer,
+    //pub(super) buf: ByteBuffer,
+    base_offset: i64,
+    last_offset_delta: i64,
+    batch_size: usize,
     pub expiration: i64,
+    pub records: Vec<Record>,
 }
+
 
 impl Debug for RecordBatch {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut de = f.debug_struct("RecordBatch");
-        de.field("magic", &self.magic());
-        de.field("offset", &(self.base_offset()..=self.last_offset()));
-        de.field("sequence", &(self.base_sequence()..=self.last_sequence()));
-        de.field("is_transactional", &self.is_transactional());
-        de.field("is_control_batch", &self.is_control_batch());
-        de.field("compression_type", &self.compression_type());
-        de.field("timestamp_type", &self.timestamp_type());
-        de.field("crc", &self.checksum());
+        de.field("base_offset", &self.base_offset);
+        de.field("last_offset_delta", &self.last_offset_delta);
+        //de.field("magic", &self.header.magic());
+        //de.field("offset", &(self.header.base_offset()..=self.header.last_offset()));
+        //de.field("sequence", &(self.header.base_sequence()..=self.header.last_sequence()));
+        //de.field("is_transactional", &self.header.is_transactional());
+        //de.field("is_control_batch", &self.header.is_control_batch());
+        //de.field("compression_type", &self.header.compression_type());
+        //de.field("timestamp_type", &self.header.timestamp_type());
+        //de.field("crc", &self.header.checksum());
         de.field("records_count", &self.records_count());
         de.field("records", &self.records());
         de.finish()
@@ -62,100 +73,173 @@ pub fn decrement_sequence(sequence: i32, decrement: i32) -> i32 {
         sequence - decrement
     }
 }
+//
+// impl RecordBatchHeader {
+//
+//     // pub fn set_partition_leader_epoch(&mut self, epoch: i32) {
+//     //     self.buf
+//     //         .mut_slice_in(PARTITION_LEADER_EPOCH_OFFSET..)
+//     //         .put_i32(epoch);
+//     // }
+//     //
+//     // pub fn magic(&self) -> i8 {
+//     //     (&self.buf[MAGIC_OFFSET..]).get_i8()
+//     // }
+//     //
+//     // pub fn base_offset(&self) -> i64 {
+//     //     (&self.buf[BASE_OFFSET_OFFSET..]).get_i64()
+//     // }
+//     //
+//
+//
+//     //
+//     // pub fn base_sequence(&self) -> i32 {
+//     //     (&self.buf[BASE_SEQUENCE_OFFSET..]).get_i32()
+//     // }
+//     //
+//     // pub fn last_sequence(&self) -> i32 {
+//     //     match self.base_sequence() {
+//     //         NO_SEQUENCE => NO_SEQUENCE,
+//     //         seq => increment_sequence(seq, self.last_offset_delta()),
+//     //     }
+//     // }
+//     //
+//     // fn last_offset_delta(&self) -> i32 {
+//     //     (&self.buf[LAST_OFFSET_DELTA_OFFSET..]).get_i32()
+//     // }
+//     //
+//     // pub fn max_timestamp(&self) -> i64 {
+//     //     (&self.buf[MAX_TIMESTAMP_OFFSET..]).get_i64()
+//     // }
+//     //
+//     // pub fn checksum(&self) -> u32 {
+//     //     (&self.buf[CRC_OFFSET..]).get_u32()
+//     // }
+//     //
+//     // pub fn is_transactional(&self) -> bool {
+//     //     self.attributes() & TRANSACTIONAL_FLAG_MASK > 0
+//     // }
+//     //
+//     // pub fn is_control_batch(&self) -> bool {
+//     //     self.attributes() & CONTROL_FLAG_MASK > 0
+//     // }
+//     //
+//     // pub fn timestamp_type(&self) -> TimestampType {
+//     //     if self.attributes() & TIMESTAMP_TYPE_MASK != 0 {
+//     //         TimestampType::LogAppendTime
+//     //     } else {
+//     //         TimestampType::CreateTime
+//     //     }
+//     // }
+//
+//     // pub fn compression_type(&self) -> CompressionType {
+//     //     (self.attributes() & COMPRESSION_CODEC_MASK).into()
+//     // }
+//     //
+//     // pub fn delete_horizon_ms(&self) -> Option<i64> {
+//     //     if self.has_delete_horizon_ms() {
+//     //         Some((&self.buf[BASE_TIMESTAMP_OFFSET..]).get_i64())
+//     //     } else {
+//     //         None
+//     //     }
+//     // }
+//     //
+//     // fn has_delete_horizon_ms(&self) -> bool {
+//     //     self.attributes() & DELETE_HORIZON_FLAG_MASK > 0
+//     // }
+//
+//     note we're not using the second byte of attributes
+
+// }
 
 impl RecordBatch {
-    pub fn set_last_offset(&mut self, offset: i64) {
-        let base_offset = offset - self.last_offset_delta() as i64;
-        self.buf
-            .mut_slice_in(BASE_OFFSET_OFFSET..)
-            .put_i64(base_offset);
-    }
-
-    pub fn set_partition_leader_epoch(&mut self, epoch: i32) {
-        self.buf
-            .mut_slice_in(PARTITION_LEADER_EPOCH_OFFSET..)
-            .put_i32(epoch);
-    }
-
-    pub fn magic(&self) -> i8 {
-        (&self.buf[MAGIC_OFFSET..]).get_i8()
-    }
-
-    pub fn base_offset(&self) -> i64 {
-        (&self.buf[BASE_OFFSET_OFFSET..]).get_i64()
-    }
-
-    pub fn last_offset(&self) -> i64 {
-        self.base_offset() + self.last_offset_delta() as i64
-    }
-
-    pub fn base_sequence(&self) -> i32 {
-        (&self.buf[BASE_SEQUENCE_OFFSET..]).get_i32()
-    }
-
-    pub fn last_sequence(&self) -> i32 {
-        match self.base_sequence() {
-            NO_SEQUENCE => NO_SEQUENCE,
-            seq => increment_sequence(seq, self.last_offset_delta()),
+    pub fn new(buf: ByteBuffer, expiration: i64, base_offset: i64, last_offset_delta: i64) -> RecordBatch {
+        let mut records = buf.slice(RECORDS_COUNT_OFFSET..);
+        let record_size = (&buf[LENGTH_OFFSET..]).get_i32();
+        let batch_size = record_size as usize + LOG_OVERHEAD;
+        RecordBatch {
+            base_offset,
+            batch_size,
+            last_offset_delta,
+            expiration,
+            records: RecordList.decode(&mut records).expect("malformed records"),
         }
-    }
-
-    fn last_offset_delta(&self) -> i32 {
-        (&self.buf[LAST_OFFSET_DELTA_OFFSET..]).get_i32()
-    }
-
-    pub fn max_timestamp(&self) -> i64 {
-        (&self.buf[MAX_TIMESTAMP_OFFSET..]).get_i64()
     }
 
     pub fn records_count(&self) -> i32 {
-        (&self.buf[RECORDS_COUNT_OFFSET..]).get_i32()
+        self.records.len() as i32
     }
 
     pub fn records(&self) -> Vec<Record> {
-        let mut records = self.buf.slice(RECORDS_COUNT_OFFSET..);
-        RecordList.decode(&mut records).expect("malformed records")
+        self.records.clone()
     }
 
-    pub fn checksum(&self) -> u32 {
-        (&self.buf[CRC_OFFSET..]).get_u32()
+    pub fn set_last_offset(&mut self, offset: i64) {
+        self.last_offset_delta = offset - self.base_offset;
     }
 
-    pub fn is_transactional(&self) -> bool {
-        self.attributes() & TRANSACTIONAL_FLAG_MASK > 0
+    pub fn last_offset(&self) -> i64 {
+        self.base_offset + self.last_offset_delta
     }
 
-    pub fn is_control_batch(&self) -> bool {
-        self.attributes() & CONTROL_FLAG_MASK > 0
+    fn to_crc(&self, data: &[u8]) -> u32 {
+        Crc::<u32>::new(&crc::CRC_32_ISCSI).checksum(data)
     }
 
-    pub fn timestamp_type(&self) -> TimestampType {
-        if self.attributes() & TIMESTAMP_TYPE_MASK != 0 {
-            TimestampType::LogAppendTime
-        } else {
-            TimestampType::CreateTime
+    pub fn encode(&self, mut buf: &mut BytesMut) {
+        /*
+        baseOffset: int64
+batchLength: int32
+partitionLeaderEpoch: int32
+magic: int8 (current magic value is 2)
+crc: uint32 of everything after it - - V
+attributes: int16
+    bit 0~2:
+        0: no compression
+        1: gzip
+        2: snappy
+        3: lz4
+        4: zstd
+    bit 3: timestampType
+    bit 4: isTransactional (0 means not transactional)
+    bit 5: isControlBatch (0 means not a control batch)
+    bit 6: hasDeleteHorizonMs (0 means baseTimestamp is not set as the delete horizon for compaction)
+    bit 7~15: unused
+lastOffsetDelta: int32
+baseTimestamp: int64
+maxTimestamp: int64
+producerId: int64
+producerEpoch: int16
+baseSequence: int32
+records: [Record]
+         */
+        buf.put_i64(self.base_offset);
+        buf.put_i32(73);
+        buf.put_i32(0); // partition leader epoch
+        buf.put_i8(2); // magic
+        buf.put_i32(0); // crc
+        buf.put_i16(0); // attributes
+        buf.put_i32(self.last_offset_delta as i32);
+        buf.put_i64(0); // base timestamp
+        buf.put_i64(0); // max timestamp
+        buf.put_i64(0); // producer ID
+        buf.put_i16(0); // producer epoch
+        buf.put_i32(0); // base sequence
+        buf.put_i32(self.records_count());
+        let mut builder = SendBuilder::new();
+        for record in &self.records {
+            record.encode(&mut builder, &record).expect("TODO: panic message");
         }
-    }
-
-    pub fn compression_type(&self) -> CompressionType {
-        (self.attributes() & COMPRESSION_CODEC_MASK).into()
-    }
-
-    pub fn delete_horizon_ms(&self) -> Option<i64> {
-        if self.has_delete_horizon_ms() {
-            Some((&self.buf[BASE_TIMESTAMP_OFFSET..]).get_i64())
-        } else {
-            None
-        }
-    }
-
-    fn has_delete_horizon_ms(&self) -> bool {
-        self.attributes() & DELETE_HORIZON_FLAG_MASK > 0
-    }
-
-    // note we're not using the second byte of attributes
-    fn attributes(&self) -> u8 {
-        (&self.buf[ATTRIBUTES_OFFSET..]).get_u16() as u8
+        let bytes = builder.get_bytes();
+        let bytes = bytes.as_slice();
+        buf.put_slice(bytes);
+        buf.put_i8(0); // TODO: tags
+        let crc = self.to_crc(&buf[ATTRIBUTES_OFFSET..]);
+        let mut crc_buf = &mut buf[CRC_OFFSET..CRC_OFFSET+CRC_LENGTH];
+        crc_buf.put_u32(crc);
+        // buf[CRC_OFFSET..].put_u32(crc);
+        error!("RecordBatch::encode: {:?}", buf);
+        error!("Computed CRC: {}", crc);
     }
 }
 

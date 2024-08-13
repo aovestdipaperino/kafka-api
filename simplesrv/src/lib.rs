@@ -395,7 +395,10 @@ impl Broker {
                         *last_offset += batch.records_count() as i64;
                         batch.set_last_offset(*last_offset - 1);
                     }
-                    store.push(records.freeze());
+                    let frozen = records.freeze();
+                    warn!("Frozen: {:?}", frozen);
+                    store.push(frozen);
+                    warn!("Partition store: {:?}", store);
                 }
                 partition_responses.push(PartitionProduceResponse {
                     index: idx,
@@ -675,9 +678,12 @@ impl Broker {
                     .topic_partition_store
                     .get(&(topic_id, idx))
                     .expect("partition not found");
+                warn!("Partition store: {:?}", self.topic_partition_store);
                 let committed_index = partition.0;
                 let fetch_offset = part.fetch_offset;
+                warn!("Fetch_offset: {:?}", fetch_offset);
                 let records = partition.1.iter().find(|r| {
+                    warn!("Batches: {:?}", r.batches());
                     for batch in r.batches() {
                         if batch.last_offset() >= fetch_offset {
                             return true;

@@ -44,6 +44,14 @@ pub trait Writable {
         self.write_u8(v as u8)
     }
 
+    fn write_varlong(&mut self, n: i64) -> io::Result<()> {
+        self.write_unsigned_varlong((n << 1) ^ (n >> 63))
+    }
+
+    fn write_varint(&mut self, n: i32) -> io::Result<()> {
+        self.write_unsigned_varint((n << 1) ^ (n >> 31))
+    }
+
     fn write_unsigned_varlong(&mut self, n: i64) -> io::Result<()> {
         let mut v = n;
         while v >= 0x80 {

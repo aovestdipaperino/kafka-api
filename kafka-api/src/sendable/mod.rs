@@ -108,6 +108,14 @@ impl SendBuilder {
         }
     }
 
+    pub fn get_bytes(&self) -> Vec<u8> {
+        let mut bytes = vec![];
+        for s in &self.sends {
+            s.write_to(&mut bytes).unwrap();
+        }
+        bytes
+    }
+
     pub fn finish(mut self) -> Vec<Sendable> {
         self.flush_bytes();
         self.sends

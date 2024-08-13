@@ -31,7 +31,7 @@ mod mutable_records;
 mod readonly_records;
 mod record;
 mod record_batch;
-const BATCH_EXPIRATION: i64 = 2 * 1000; // 15 seconds.
+const BATCH_EXPIRATION: i64 = 3600 * 1000; // 15 seconds.
 
 fn load_batches(buf: &ByteBuffer) -> Vec<RecordBatch> {
     let mut batches = vec![];
@@ -60,7 +60,9 @@ fn load_batches(buf: &ByteBuffer) -> Vec<RecordBatch> {
                 let buf = buf.slice(offset..offset + batch_size);
                 offset += batch_size;
                 remaining -= batch_size;
-                RecordBatch { buf, expiration }
+                let base_offset = buf.slice(BASE_OFFSET_OFFSET..).get_i64();
+                let last_offset_delta = buf.slice(LAST_OFFSET_DELTA_OFFSET..).get_i32() as i64;
+                RecordBatch::new(buf, expiration, base_offset, last_offset_delta)
             }
             v => unimplemented!("record batch version {}", v),
         };
