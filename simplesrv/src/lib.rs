@@ -44,13 +44,13 @@ use kafka_api::{
     },
     produce_request::ProduceRequest,
     produce_response::{PartitionProduceResponse, ProduceResponse, TopicProduceResponse},
-    records::ReadOnlyBatches,
     request_header::RequestHeader,
     sync_group_request::SyncGroupRequest,
     sync_group_response::SyncGroupResponse,
     Request, Response,
 };
 use tracing::{debug, error, trace, warn};
+use kafka_api::records::{Record, RecordBatch};
 
 #[derive(Debug, Clone)]
 pub struct ClientInfo {
@@ -204,7 +204,7 @@ pub struct Broker {
     cluster_meta: ClusterMeta,
     topics: BTreeMap<String, TopicMeta>,
     producers: AtomicI64,
-    topic_partition_store: BTreeMap<(uuid::Uuid, i32), (i64, Vec<ReadOnlyBatches>)>,
+    topic_partition_store: BTreeMap<(uuid::Uuid, i32), (i64, Vec<(i64, Record)>)>,
     group_coordinator: GroupCoordinator,
 }
 
@@ -375,7 +375,8 @@ impl Broker {
     }
 
     fn receive_produce(&mut self, request: ProduceRequest) -> ProduceResponse {
-        self.purge_expired_batches();
+        //self.purge_expired_batches();
+        let expiration = chrono::Utc::now().timestamp_millis() + 60000;
         let mut responses = vec![];
         for topic in request.topic_data {
             let topic_name = topic.name.clone();
@@ -384,20 +385,29 @@ impl Broker {
             let mut partition_responses = vec![];
             for partition in topic.partition_data {
                 let idx = partition.index;
-                if let Some(mut records) = partition.records {
+                if let Some(records) = partition.records {
                     // TODO - return error on topic partition not exist
-                    let (last_offset, store) = self
+                    let (_, store) = self
                         .topic_partition_store
                         .get_mut(&(topic_meta.topic_id, idx))
                         .unwrap();
-                    for batch in records.mut_batches() {
-                        trace!("storing batch {batch:?} with last_offset {last_offset}");
-                        *last_offset += batch.records_count() as i64;
-                        batch.set_last_offset(*last_offset - 1);
+
+                    let all_records: Vec<_> = records.batches().iter()
+                        .flat_map(|r| &r.records).collect();
+
+                    // REMOVE THE CLONE
+                    for record in all_records {
+                        store.push((expiration, record.clone()));
                     }
-                    let frozen = records.freeze();
-                    warn!("Frozen: {:?}", frozen);
-                    store.push(frozen);
+
+                    // for batch in records.mut_batches() {
+                    //     trace!("storing batch {batch:?} with last_offset {last_offset}");
+                    //     *last_offset += batch.records_count() as i64;
+                    //     batch.set_last_offset(*last_offset - 1);
+                    // }
+                    // let frozen = records.freeze();
+                    // warn!("Frozen: {:?}", frozen);
+                    //store.push(frozen);
                     warn!("Partition store: {:?}", store);
                 }
                 partition_responses.push(PartitionProduceResponse {
@@ -644,16 +654,12 @@ impl Broker {
     }
 
     pub fn purge_expired_batches(&mut self) {
+        return;
         let now = chrono::Utc::now().timestamp_millis();
         for ((_, _), (_, batches)) in self.topic_partition_store.iter_mut() {
             let original_len = batches.len();
             batches.retain(|r| {
-                for batch in r.batches() {
-                    if batch.expiration < now {
-                        return false;
-                    }
-                }
-                true
+                r.0 < now
             });
             let purged = original_len - batches.len();
             if purged > 0 {
@@ -674,29 +680,31 @@ impl Broker {
             let mut partitions = vec![];
             for part in topic.partitions.iter() {
                 let idx = part.partition;
+                warn!("Partition: {idx}");
                 let partition = self
                     .topic_partition_store
                     .get(&(topic_id, idx))
                     .expect("partition not found");
-                warn!("Partition store: {:?}", self.topic_partition_store);
+                warn!("Partition store: {:?}", partition);
                 let committed_index = partition.0;
                 let fetch_offset = part.fetch_offset;
                 warn!("Fetch_offset: {:?}", fetch_offset);
-                let records = partition.1.iter().find(|r| {
-                    warn!("Batches: {:?}", r.batches());
-                    for batch in r.batches() {
-                        if batch.last_offset() >= fetch_offset {
-                            return true;
-                        }
-                    }
-                    false
-                });
+                let records = partition.1.iter().enumerate().find(|(idx, _)| {
+                    committed_index + ( *idx as i64) >= fetch_offset
+                }).map(|r| r.1.1.clone());
+                let records = match records {
+                    Some(r) => vec![r],
+                    None => vec![],
+                };
+
+                let records = RecordBatch::convert_to_record_batch(records);
+
                 partitions.push(PartitionData {
                     partition_index: idx,
                     high_watermark: committed_index,
                     last_stable_offset: committed_index,
                     log_start_offset: 0,
-                    records: records.cloned().unwrap_or_default(),
+                    records,
                     ..Default::default()
                 });
             }

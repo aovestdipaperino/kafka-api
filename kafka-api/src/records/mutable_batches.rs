@@ -60,6 +60,8 @@ impl MutableBatches {
         MutableBatches { buf, batches }
     }
 
+
+
     pub fn freeze(self) -> ReadOnlyBatches {
         // Create a new buffer here.
         let mut buf = bytes::BytesMut::new();

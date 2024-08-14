@@ -183,8 +183,50 @@ impl RecordBatch {
         self.base_offset + self.last_offset_delta
     }
 
-    fn to_crc(&self, data: &[u8]) -> u32 {
+    fn compute_crc(data: &[u8]) -> u32 {
         Crc::<u32>::new(&crc::CRC_32_ISCSI).checksum(data)
+    }
+
+    fn encode_record_batch(buf: &mut BytesMut, base_offset: i64, records: Vec<Record>) {
+        buf.put_i64(base_offset);
+        buf.put_i32(0); // length to be filled
+        buf.put_i32(0); // partition leader epoch
+        buf.put_i8(2); // magic
+        buf.put_i32(0); // crc
+        buf.put_i16(0); // attributes
+        buf.put_i32(records.len() as i32); // last_offset_delta
+        buf.put_i64(0); // base timestamp
+        buf.put_i64(0); // max timestamp
+        buf.put_i64(0); // producer ID
+        buf.put_i16(0); // producer epoch
+        buf.put_i32(0); // base sequence
+        buf.put_i32(records.len() as i32);
+        let mut builder = SendBuilder::new();
+        for record in records {
+            record.encode(&mut builder, &record).expect("TODO: panic message");
+        }
+        let bytes = builder.get_bytes();
+        let bytes = bytes.as_slice();
+        buf.put_slice(bytes);
+        buf.put_i8(0); // TODO: tags
+        let crc = Self::compute_crc(&buf[ATTRIBUTES_OFFSET..]);
+
+        let mut crc_buf = &mut buf[CRC_OFFSET..CRC_OFFSET+CRC_LENGTH];
+        crc_buf.put_u32(crc);
+
+        let len = buf.len()  - LOG_OVERHEAD;
+        let mut size_buf = &mut buf[LENGTH_OFFSET..LENGTH_OFFSET+LENGTH_LENGTH];
+        size_buf.put_i32(len as i32);
+
+    }
+
+    pub fn convert_to_record_batch(records: Vec<Record>) -> ReadOnlyBatches {
+        if records.is_empty() {
+            return ReadOnlyBatches::None;
+        }
+        let mut buf = BytesMut::new();
+        Self::encode_record_batch(&mut buf, 0, records);
+        ReadOnlyBatches::ByteBuffer(ByteBufferRecords::new(ByteBuffer::new(buf.to_vec())))
     }
 
     pub fn encode(&self, buf: &mut BytesMut) {
@@ -235,7 +277,7 @@ records: [Record]
         let bytes = bytes.as_slice();
         buf.put_slice(bytes);
         buf.put_i8(0); // TODO: tags
-        let crc = self.to_crc(&buf[ATTRIBUTES_OFFSET..]);
+        let crc = Self::compute_crc(&buf[ATTRIBUTES_OFFSET..]);
 
         let mut crc_buf = &mut buf[CRC_OFFSET..CRC_OFFSET+CRC_LENGTH];
         crc_buf.put_u32(crc);
