@@ -21,7 +21,6 @@ use std::{
 };
 
 use bytes::Buf;
-use log::warn;
 use kafka_api::{bytebuffer::ByteBuffer, sendable::SendBuilder, Request};
 use simplesrv::{Broker, BrokerMeta, ClientInfo, ClusterMeta};
 use tracing::{error, error_span, info, Level};

@@ -16,7 +16,6 @@ use std::{
     cell::OnceCell,
     fmt::{Debug, Formatter},
 };
-use bytes::BufMut;
 use tracing::warn;
 
 use crate::{bytebuffer::ByteBuffer, records::*};

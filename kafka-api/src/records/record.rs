@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::hash::Hasher;
 use std::io;
 use crate::bytebuffer::ByteBuffer;
-use crate::codec::{Encoder, NullableBytes32};
-use crate::records::ReadOnlyBatches;
+use crate::codec::{Encoder};
 use crate::Writable;
 
 #[derive(Debug, Default, Clone)]
@@ -61,7 +59,7 @@ impl Encoder<&Record> for Record {
         Ok(())
     }
 
-    fn calculate_size(&self, value: &Record) -> usize {
+    fn calculate_size(&self, _: &Record) -> usize {
         // let mut size = 0;
         // size += self.len.len();
         // size += 1;

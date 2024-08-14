@@ -141,16 +141,6 @@ impl ByteBuffer {
         unsafe { slice::from_raw_parts_mut(self.ptr(), self.len()) }
     }
 
-    // SAFETY - modifications are nonoverlapping
-    //
-    // We cannot implement AsMut / DerefMut for this conventions, cause impl trait will be public
-    // visible, but we need to narrow the mutations within this crate (for in place mutate memory
-    // batches).
-    pub(crate) fn mut_slice_in(&mut self, range: impl RangeBounds<usize>) -> &mut [u8] {
-        let (begin, end) = self.check_range(range);
-        &mut (unsafe { slice::from_raw_parts_mut(self.ptr(), self.len()) }[begin..end])
-    }
-
     fn check_range(&self, range: impl RangeBounds<usize>) -> (usize, usize) {
         use core::ops::Bound;
 

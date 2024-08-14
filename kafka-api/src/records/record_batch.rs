@@ -13,11 +13,9 @@
 // limitations under the License.
 
 use std::fmt::{Debug, Formatter};
-use std::io::Write;
-use bytes::{Buf, BufMut, BytesMut};
+use bytes::{BufMut, BytesMut};
 use crc::Crc;
 use tracing::error;
-use uuid::Bytes;
 use crate::{
     bytebuffer::ByteBuffer,
     codec::{Decoder, RecordList},
@@ -31,7 +29,6 @@ pub struct RecordBatch {
     //pub(super) buf: ByteBuffer,
     base_offset: i64,
     last_offset_delta: i64,
-    batch_size: usize,
     pub expiration: i64,
     pub records: Vec<Record>,
 }
@@ -155,11 +152,9 @@ pub fn decrement_sequence(sequence: i32, decrement: i32) -> i32 {
 impl RecordBatch {
     pub fn new(buf: ByteBuffer, expiration: i64, base_offset: i64, last_offset_delta: i64) -> RecordBatch {
         let mut records = buf.slice(RECORDS_COUNT_OFFSET..);
-        let record_size = (&buf[LENGTH_OFFSET..]).get_i32();
-        let batch_size = record_size as usize + LOG_OVERHEAD;
+
         RecordBatch {
             base_offset,
-            batch_size,
             last_offset_delta,
             expiration,
             records: RecordList.decode(&mut records).expect("malformed records"),
@@ -192,7 +187,7 @@ impl RecordBatch {
         Crc::<u32>::new(&crc::CRC_32_ISCSI).checksum(data)
     }
 
-    pub fn encode(&self, mut buf: &mut BytesMut) {
+    pub fn encode(&self, buf: &mut BytesMut) {
         /*
         baseOffset: int64
 batchLength: int32
