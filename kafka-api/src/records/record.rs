@@ -16,7 +16,7 @@ use std::hash::Hasher;
 use std::io;
 use crate::bytebuffer::ByteBuffer;
 use crate::codec::{Encoder, NullableBytes32};
-use crate::records::ReadOnlyRecords;
+use crate::records::ReadOnlyBatches;
 use crate::Writable;
 
 #[derive(Debug, Default, Clone)]

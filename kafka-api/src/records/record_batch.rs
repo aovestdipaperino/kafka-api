@@ -259,7 +259,7 @@ mod tests {
     use std::io;
 
     use super::*;
-    use crate::records::MutableRecords;
+    use crate::records::MutableBatches;
 
     const RECORD: &[u8] = &[
         0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, // first offset
@@ -289,7 +289,7 @@ mod tests {
 
     #[test]
     fn test_codec_records() -> io::Result<()> {
-        let records = MutableRecords::new(ByteBuffer::new(RECORD.to_vec()));
+        let records = MutableBatches::new(ByteBuffer::new(RECORD.to_vec()));
         let record_batches = records.batches();
         assert_eq!(record_batches.len(), 1);
         let record_batch = &record_batches[0];

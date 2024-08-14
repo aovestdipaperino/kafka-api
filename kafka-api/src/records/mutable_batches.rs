@@ -23,45 +23,45 @@ use crate::{bytebuffer::ByteBuffer, records::*};
 use crate::records::{ByteBuffer as BB, ByteBufferRecords};
 
 #[derive(Default)]
-pub struct MutableRecords {
+pub struct MutableBatches {
     buf: ByteBuffer,
     batches: OnceCell<Vec<RecordBatch>>,
 }
 
-impl Clone for MutableRecords {
+impl Clone for MutableBatches {
     /// ATTENTION - Cloning Records is a heavy operation.
     ///
-    /// MutableRecords is a public struct and it has a [MutableRecords::mut_batches] method that
+    /// MutableRecords is a public struct and it has a [MutableBatches::mut_batches] method that
     /// modifies the underlying [ByteBuffer]. If we only do a shallow clone, then two MutableRecords
     /// that doesn't have any ownership overlapping can modify the same underlying bytes.
     ///
-    /// Generally, MutableRecords users iterate over batches with [MutableRecords::batches] or
-    /// [MutableRecords::mut_batches], and pass ownership instead of clone. This clone behavior is
+    /// Generally, MutableRecords users iterate over batches with [MutableBatches::batches] or
+    /// [MutableBatches::mut_batches], and pass ownership instead of clone. This clone behavior is
     /// similar to clone a [Vec].
     ///
-    /// To produce a read-only view without copy, use [MutableRecords::freeze] instead.
+    /// To produce a read-only view without copy, use [MutableBatches::freeze] instead.
     fn clone(&self) -> Self {
         warn!("Cloning mutable records will copy bytes and is not encouraged; try MutableRecords::freeze.");
-        MutableRecords {
+        MutableBatches {
             buf: ByteBuffer::new(self.buf.to_vec()),
             batches: OnceCell::new(),
         }
     }
 }
 
-impl Debug for MutableRecords {
+impl Debug for MutableBatches {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         Debug::fmt(self.batches(), f)
     }
 }
 
-impl MutableRecords {
+impl MutableBatches {
     pub fn new(buf: ByteBuffer) -> Self {
         let batches = OnceCell::new();
-        MutableRecords { buf, batches }
+        MutableBatches { buf, batches }
     }
 
-    pub fn freeze(self) -> ReadOnlyRecords {
+    pub fn freeze(self) -> ReadOnlyBatches {
         // Create a new buffer here.
         let mut buf = bytes::BytesMut::new();
         let records = self.batches.get().expect("Should be set");
@@ -71,7 +71,7 @@ impl MutableRecords {
             record_batch.encode(& mut buf);
         }
 
-        ReadOnlyRecords::ByteBuffer(ByteBufferRecords::new(BB::new(buf.to_vec())))
+        ReadOnlyBatches::ByteBuffer(ByteBufferRecords::new(BB::new(buf.to_vec())))
     }
 
     pub fn as_bytes(&self) -> &[u8] {

@@ -17,31 +17,31 @@ use std::io;
 use crate::records::*;
 
 #[derive(Debug, Default, Clone)]
-pub enum ReadOnlyRecords {
+pub enum ReadOnlyBatches {
     #[default]
     None,
     ByteBuffer(ByteBufferRecords),
 }
 
-impl ReadOnlyRecords {
+impl ReadOnlyBatches {
     pub fn size(&self) -> usize {
         match self {
-            ReadOnlyRecords::None => 0,
-            ReadOnlyRecords::ByteBuffer(r) => r.buf.len(),
+            ReadOnlyBatches::None => 0,
+            ReadOnlyBatches::ByteBuffer(r) => r.buf.len(),
         }
     }
 
     pub fn batches(&self) -> &[RecordBatch] {
         match self {
-            ReadOnlyRecords::None => &[],
-            ReadOnlyRecords::ByteBuffer(r) => r.batches(),
+            ReadOnlyBatches::None => &[],
+            ReadOnlyBatches::ByteBuffer(r) => r.batches(),
         }
     }
 
     pub fn write_to<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
         match self {
-            ReadOnlyRecords::None => writer.write_all(&[]),
-            ReadOnlyRecords::ByteBuffer(r) => writer.write_all(r.buf.as_bytes()),
+            ReadOnlyBatches::None => writer.write_all(&[]),
+            ReadOnlyBatches::ByteBuffer(r) => writer.write_all(r.buf.as_bytes()),
         }
     }
 }

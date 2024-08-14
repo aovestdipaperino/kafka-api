@@ -15,7 +15,7 @@
 use std::io;
 
 use crate::{
-    codec::*, err_decode_message_null, err_decode_message_unsupported, records::MutableRecords,
+    codec::*, err_decode_message_null, err_decode_message_unsupported, records::MutableBatches,
 };
 
 // Version 1 and 2 are the same as version 0.
@@ -104,7 +104,7 @@ pub struct PartitionProduceData {
     /// The partition index.
     pub index: i32,
     /// The record data to be produced.
-    pub records: Option<MutableRecords>,
+    pub records: Option<MutableBatches>,
     /// Unknown tagged fields.
     pub unknown_tagged_fields: Vec<RawTaggedField>,
 }

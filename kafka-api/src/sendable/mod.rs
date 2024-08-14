@@ -16,7 +16,7 @@ use std::io;
 
 use bytes::BufMut;
 
-use crate::{bytebuffer::ByteBuffer, codec::writable::Writable, records::ReadOnlyRecords};
+use crate::{bytebuffer::ByteBuffer, codec::writable::Writable, records::ReadOnlyBatches};
 
 pub struct SendBuilder {
     sends: Vec<Sendable>,
@@ -85,7 +85,7 @@ impl Writable for SendBuilder {
         Ok(())
     }
 
-    fn write_records(&mut self, r: &ReadOnlyRecords) -> io::Result<()> {
+    fn write_records(&mut self, r: &ReadOnlyBatches) -> io::Result<()> {
         self.flush_bytes();
         // shallow clone - only metadata copied
         let r = r.clone();
@@ -133,7 +133,7 @@ impl SendBuilder {
 pub enum Sendable {
     Bytes(bytes::Bytes),
     ByteBuffer(ByteBuffer),
-    Records(ReadOnlyRecords),
+    Records(ReadOnlyBatches),
 }
 
 impl Sendable {

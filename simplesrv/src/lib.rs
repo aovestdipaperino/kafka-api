@@ -44,7 +44,7 @@ use kafka_api::{
     },
     produce_request::ProduceRequest,
     produce_response::{PartitionProduceResponse, ProduceResponse, TopicProduceResponse},
-    records::ReadOnlyRecords,
+    records::ReadOnlyBatches,
     request_header::RequestHeader,
     sync_group_request::SyncGroupRequest,
     sync_group_response::SyncGroupResponse,
@@ -204,7 +204,7 @@ pub struct Broker {
     cluster_meta: ClusterMeta,
     topics: BTreeMap<String, TopicMeta>,
     producers: AtomicI64,
-    topic_partition_store: BTreeMap<(uuid::Uuid, i32), (i64, Vec<ReadOnlyRecords>)>,
+    topic_partition_store: BTreeMap<(uuid::Uuid, i32), (i64, Vec<ReadOnlyBatches>)>,
     group_coordinator: GroupCoordinator,
 }
 

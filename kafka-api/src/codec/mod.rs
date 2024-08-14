@@ -18,7 +18,7 @@ pub use crate::codec::{readable::Readable, writable::Writable};
 use crate::{
     bytebuffer::ByteBuffer,
     err_codec_message,
-    records::{Header, MutableRecords, ReadOnlyRecords, Record},
+    records::{Header, MutableBatches, ReadOnlyBatches, Record},
 };
 
 pub mod readable;
@@ -376,8 +376,8 @@ impl Encoder<&str> for NullableString {
 #[derive(Debug, Copy, Clone)]
 pub(super) struct NullableRecords(pub bool /* flexible */);
 
-impl Decoder<Option<MutableRecords>> for NullableRecords {
-    fn decode<B: Readable>(&self, buf: &mut B) -> io::Result<Option<MutableRecords>> {
+impl Decoder<Option<MutableBatches>> for NullableRecords {
+    fn decode<B: Readable>(&self, buf: &mut B) -> io::Result<Option<MutableBatches>> {
         match if self.0 {
             VarInt.decode(buf)? - 1
         } else {
@@ -402,8 +402,8 @@ impl Decoder<Option<MutableRecords>> for NullableRecords {
     }
 }
 
-impl Encoder<Option<&ReadOnlyRecords>> for NullableRecords {
-    fn encode<B: Writable>(&self, buf: &mut B, value: Option<&ReadOnlyRecords>) -> io::Result<()> {
+impl Encoder<Option<&ReadOnlyBatches>> for NullableRecords {
+    fn encode<B: Writable>(&self, buf: &mut B, value: Option<&ReadOnlyBatches>) -> io::Result<()> {
         match value {
             None => {
                 if self.0 {
@@ -425,7 +425,7 @@ impl Encoder<Option<&ReadOnlyRecords>> for NullableRecords {
         Ok(())
     }
 
-    fn calculate_size(&self, value: Option<&ReadOnlyRecords>) -> usize {
+    fn calculate_size(&self, value: Option<&ReadOnlyBatches>) -> usize {
         match value {
             None => {
                 if self.0 {
@@ -446,12 +446,12 @@ impl Encoder<Option<&ReadOnlyRecords>> for NullableRecords {
     }
 }
 
-impl Encoder<&ReadOnlyRecords> for NullableRecords {
-    fn encode<B: Writable>(&self, buf: &mut B, value: &ReadOnlyRecords) -> io::Result<()> {
+impl Encoder<&ReadOnlyBatches> for NullableRecords {
+    fn encode<B: Writable>(&self, buf: &mut B, value: &ReadOnlyBatches) -> io::Result<()> {
         self.encode(buf, Some(value))
     }
 
-    fn calculate_size(&self, value: &ReadOnlyRecords) -> usize {
+    fn calculate_size(&self, value: &ReadOnlyBatches) -> usize {
         self.calculate_size(Some(value))
     }
 }

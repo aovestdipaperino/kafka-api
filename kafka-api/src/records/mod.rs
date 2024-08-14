@@ -19,16 +19,16 @@ use std::{
 
 use bytes::Buf;
 pub use consts::*;
-pub use mutable_records::*;
-pub use readonly_records::*;
+pub use mutable_batches::*;
+pub use readonly_batches::*;
 pub use record::*;
 pub use record_batch::*;
 
 use crate::bytebuffer::ByteBuffer;
 
 mod consts;
-mod mutable_records;
-mod readonly_records;
+mod mutable_batches;
+mod readonly_batches;
 mod record;
 mod record_batch;
 const BATCH_EXPIRATION: i64 = 3600 * 1000; // 15 seconds.
