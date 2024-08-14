@@ -689,15 +689,15 @@ impl Broker {
                 let committed_index = partition.0;
                 let fetch_offset = part.fetch_offset;
                 warn!("Fetch_offset: {:?}", fetch_offset);
-                let records = partition.1.iter().enumerate().find(|(idx, _)| {
+                let record: Option<_> = partition.1.iter().enumerate().find(|(idx, _)| {
                     committed_index + ( *idx as i64) >= fetch_offset
-                }).map(|r| r.1.1.clone());
-                let records = match records {
-                    Some(r) => vec![r],
-                    None => vec![],
+                });
+                let records = match record {
+                    Some(r) => (r.0, vec![r.1.1.clone()]),
+                    None => (0, vec![]),
                 };
 
-                let records = RecordBatch::convert_to_record_batch(records);
+                let records = RecordBatch::convert_to_record_batch(records.0 as i64, records.1);
 
                 partitions.push(PartitionData {
                     partition_index: idx,

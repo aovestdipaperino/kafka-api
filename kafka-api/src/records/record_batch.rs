@@ -194,7 +194,9 @@ impl RecordBatch {
         buf.put_i8(2); // magic
         buf.put_i32(0); // crc
         buf.put_i16(0); // attributes
-        buf.put_i32(records.len() as i32); // last_offset_delta
+        // the assumption here is that all the records we are shipping back
+        // have a consecutive offset with no gaps.
+        buf.put_i32((records.len() - 1) as i32); // last_offset_delta
         buf.put_i64(0); // base timestamp
         buf.put_i64(0); // max timestamp
         buf.put_i64(0); // producer ID
@@ -220,12 +222,12 @@ impl RecordBatch {
 
     }
 
-    pub fn convert_to_record_batch(records: Vec<Record>) -> ReadOnlyBatches {
+    pub fn convert_to_record_batch(base_offset: i64, records: Vec<Record>) -> ReadOnlyBatches {
         if records.is_empty() {
             return ReadOnlyBatches::None;
         }
         let mut buf = BytesMut::new();
-        Self::encode_record_batch(&mut buf, 0, records);
+        Self::encode_record_batch(&mut buf, base_offset, records);
         ReadOnlyBatches::ByteBuffer(ByteBufferRecords::new(ByteBuffer::new(buf.to_vec())))
     }
 
