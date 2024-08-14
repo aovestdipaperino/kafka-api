@@ -220,7 +220,7 @@ baseSequence: int32
 records: [Record]
          */
         buf.put_i64(self.base_offset);
-        buf.put_i32(73);
+        buf.put_i32(0); // length to be filled
         buf.put_i32(0); // partition leader epoch
         buf.put_i8(2); // magic
         buf.put_i32(0); // crc
@@ -241,8 +241,13 @@ records: [Record]
         buf.put_slice(bytes);
         buf.put_i8(0); // TODO: tags
         let crc = self.to_crc(&buf[ATTRIBUTES_OFFSET..]);
+
         let mut crc_buf = &mut buf[CRC_OFFSET..CRC_OFFSET+CRC_LENGTH];
         crc_buf.put_u32(crc);
+
+        let len = buf.len()  - LOG_OVERHEAD;
+        let mut size_buf = &mut buf[LENGTH_OFFSET..LENGTH_OFFSET+LENGTH_LENGTH];
+        size_buf.put_i32(len as i32);
         // buf[CRC_OFFSET..].put_u32(crc);
         error!("RecordBatch::encode: {:?}", buf);
         error!("Computed CRC: {}", crc);

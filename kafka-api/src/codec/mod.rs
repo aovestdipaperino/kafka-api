@@ -775,12 +775,12 @@ impl Decoder<Vec<Record>> for RecordList {
             {
                 let len = buf.read_varint()?;
                 record.key_len = len;
-                record.key = read_nullable_bytes(buf, len, "bytes")?;
+                record.key = read_nullable_bytes(buf, len, "bytes").expect("invalid key length");
             }
             {
                 let len = buf.read_varint()?;
                 record.value_len = len;
-                record.value = read_nullable_bytes(buf, len, "bytes")?;
+                record.value = read_nullable_bytes(buf, len, "bytes").expect("invalid value length");
             }
             let headers_cnt = buf.read_varint()?;
             for _ in 0..headers_cnt {
