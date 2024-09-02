@@ -31,7 +31,7 @@ mod mutable_records;
 mod readonly_records;
 mod record;
 mod record_batch;
-const BATCH_EXPIRATION: i64 = 2 * 1000; // 15 seconds.
+const BATCH_EXPIRATION: i64 = 3600 * 1000; // 15 seconds.
 
 fn load_batches(buf: &ByteBuffer) -> Vec<RecordBatch> {
     let mut batches = vec![];
