@@ -38,6 +38,8 @@ pub mod heartbeat_request;
 pub mod heartbeat_response;
 pub mod join_group_request;
 pub mod join_group_response;
+pub mod list_offsets_request;
+pub mod list_offsets_response;
 pub mod metadata_request;
 pub mod metadata_response;
 pub mod offset_fetch_request;
@@ -49,7 +51,6 @@ pub mod response_header;
 pub mod sync_group_request;
 pub mod sync_group_response;
 
-
 #[derive(Debug)]
 pub enum Request {
     ApiVersionsRequest(api_versions_request::ApiVersionsRequest),
@@ -59,6 +60,7 @@ pub enum Request {
     HeartbeatRequest(heartbeat_request::HeartbeatRequest),
     InitProducerIdRequest(init_producer_id_request::InitProducerIdRequest),
     JoinGroupRequest(join_group_request::JoinGroupRequest),
+    ListOffsetsRequest(list_offsets_request::ListOffsetsRequest),
     MetadataRequest(metadata_request::MetadataRequest),
     OffsetFetchRequest(offset_fetch_request::OffsetFetchRequest),
     ProduceRequest(produce_request::ProduceRequest),
@@ -119,6 +121,10 @@ impl Request {
                 sync_group_request::SyncGroupRequest::read(buf, api_version)
                     .map(Request::SyncGroupRequest)
             }
+            ApiMessageType::LIST_OFFSETS => {
+                list_offsets_request::ListOffsetsRequest::read(buf, api_version)
+                    .map(Request::ListOffsetsRequest)
+            }
             _ => unimplemented!("{}", api_type.api_key),
         }?;
 
@@ -134,6 +140,7 @@ pub enum Response {
     FetchResponse(fetch_response::FetchResponse),
     HeartbeatResponse(heartbeat_response::HeartbeatResponse),
     InitProducerIdResponse(init_producer_id_response::InitProducerIdResponse),
+    ListOffsetsResponse(list_offsets_response::ListOffsetsResponse),
     JoinGroupResponse(join_group_response::JoinGroupResponse),
     MetadataResponse(metadata_response::MetadataResponse),
     OffsetFetchResponse(offset_fetch_response::OffsetFetchResponse),
@@ -173,6 +180,7 @@ impl Response {
             Response::FetchResponse(resp) => resp.calculate_size(version),
             Response::HeartbeatResponse(resp) => resp.calculate_size(version),
             Response::InitProducerIdResponse(resp) => resp.calculate_size(version),
+            Response::ListOffsetsResponse(resp) => resp.calculate_size(version),
             Response::JoinGroupResponse(resp) => resp.calculate_size(version),
             Response::MetadataResponse(resp) => resp.calculate_size(version),
             Response::OffsetFetchResponse(resp) => resp.calculate_size(version),
@@ -189,6 +197,7 @@ impl Response {
             Response::FetchResponse(resp) => resp.write(buf, version)?,
             Response::HeartbeatResponse(resp) => resp.write(buf, version)?,
             Response::InitProducerIdResponse(resp) => resp.write(buf, version)?,
+            Response::ListOffsetsResponse(resp) => resp.write(buf, version)?,
             Response::JoinGroupResponse(resp) => resp.write(buf, version)?,
             Response::MetadataResponse(resp) => resp.write(buf, version)?,
             Response::OffsetFetchResponse(resp) => resp.write(buf, version)?,
