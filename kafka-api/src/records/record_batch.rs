@@ -25,7 +25,7 @@ use crate::{
 #[derive(Default)]
 pub struct RecordBatch {
     pub(super) buf: ByteBuffer,
-    pub expiration: i64,
+    pub ingestion_time: i64,
 }
 
 impl Debug for RecordBatch {

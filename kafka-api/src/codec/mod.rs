@@ -413,11 +413,10 @@ impl Encoder<Option<&ReadOnlyRecords>> for NullableRecords {
                 }
             }
             Some(r) => {
-                let len = r.size() as i16;
                 if self.0 {
-                    VarInt.encode(buf, len as i32 + 1)?;
+                    VarInt.encode(buf, r.size() as i32 + 1)?;
                 } else {
-                    Int16.encode(buf, len)?;
+                    Int16.encode(buf, r.size() as i16)?;
                 }
                 buf.write_records(r)?;
             }
