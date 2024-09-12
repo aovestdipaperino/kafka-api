@@ -57,14 +57,11 @@ pub enum Request {
     CreateTopicRequest(create_topic_request::CreateTopicsRequest),
     FetchRequest(fetch_request::FetchRequest),
     FindCoordinatorRequest(find_coordinator_request::FindCoordinatorRequest),
-    HeartbeatRequest(heartbeat_request::HeartbeatRequest),
     InitProducerIdRequest(init_producer_id_request::InitProducerIdRequest),
-    JoinGroupRequest(join_group_request::JoinGroupRequest),
     ListOffsetsRequest(list_offsets_request::ListOffsetsRequest),
     MetadataRequest(metadata_request::MetadataRequest),
     OffsetFetchRequest(offset_fetch_request::OffsetFetchRequest),
     ProduceRequest(produce_request::ProduceRequest),
-    SyncGroupRequest(sync_group_request::SyncGroupRequest),
 }
 
 impl Request {
@@ -96,17 +93,9 @@ impl Request {
                 find_coordinator_request::FindCoordinatorRequest::read(buf, api_version)
                     .map(Request::FindCoordinatorRequest)
             }
-            ApiMessageType::HEARTBEAT => {
-                heartbeat_request::HeartbeatRequest::read(buf, api_version)
-                    .map(Request::HeartbeatRequest)
-            }
             ApiMessageType::INIT_PRODUCER_ID => {
                 init_producer_id_request::InitProducerIdRequest::read(buf, api_version)
                     .map(Request::InitProducerIdRequest)
-            }
-            ApiMessageType::JOIN_GROUP => {
-                join_group_request::JoinGroupRequest::read(buf, api_version)
-                    .map(Request::JoinGroupRequest)
             }
             ApiMessageType::METADATA => metadata_request::MetadataRequest::read(buf, api_version)
                 .map(Request::MetadataRequest),
@@ -116,10 +105,6 @@ impl Request {
             }
             ApiMessageType::PRODUCE => {
                 produce_request::ProduceRequest::read(buf, api_version).map(Request::ProduceRequest)
-            }
-            ApiMessageType::SYNC_GROUP => {
-                sync_group_request::SyncGroupRequest::read(buf, api_version)
-                    .map(Request::SyncGroupRequest)
             }
             ApiMessageType::LIST_OFFSETS => {
                 list_offsets_request::ListOffsetsRequest::read(buf, api_version)
