@@ -1,10 +1,17 @@
 use std::io;
-use crate::{RawTaggedField, Serializable, Writable};
-use crate::codec::{Encoder, FixedSizeEncoder, Int16, Int32, Int64, NullableArray, NullableString, RawTaggedFieldList, Struct};
+
+use crate::{
+    codec::{
+        Encoder, FixedSizeEncoder, Int16, Int32, Int64, NullableArray, NullableString,
+        RawTaggedFieldList, Struct,
+    },
+    RawTaggedField, Serializable, Writable,
+};
 
 #[derive(Debug, Clone, Default)]
 pub struct ListOffsetsResponse {
-    /// The duration in milliseconds for which the request was throttled due to a quota violation, or zero if the request did not violate any quota.
+    /// The duration in milliseconds for which the request was throttled due to a quota violation,
+    /// or zero if the request did not violate any quota.
     ///
     /// Supported API versions: 2-8
     pub throttle_time_ms: i32,
@@ -32,7 +39,8 @@ impl Serializable for ListOffsetsTopicResponse {
 
     fn calculate_size(&self, version: i16) -> usize {
         let mut res = NullableString(version >= 6).calculate_size(self.name.as_deref());
-        res += NullableArray(Struct(version), version >= 6).calculate_size(self.partitions.as_slice());
+        res +=
+            NullableArray(Struct(version), version >= 6).calculate_size(self.partitions.as_slice());
         if version >= 6 {
             res += RawTaggedFieldList.calculate_size(&self.unknown_tagged_fields);
         }

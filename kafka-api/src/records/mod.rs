@@ -32,7 +32,6 @@ mod readonly_records;
 mod record;
 mod record_batch;
 
-
 fn load_batches(buf: &ByteBuffer) -> Vec<RecordBatch> {
     let mut batches = vec![];
     let ingestion_time = chrono::Utc::now().timestamp_millis();
@@ -60,7 +59,10 @@ fn load_batches(buf: &ByteBuffer) -> Vec<RecordBatch> {
                 let buf = buf.slice(offset..offset + batch_size);
                 offset += batch_size;
                 remaining -= batch_size;
-                RecordBatch { buf, ingestion_time }
+                RecordBatch {
+                    buf,
+                    ingestion_time,
+                }
             }
             v => unimplemented!("record batch version {}", v),
         };

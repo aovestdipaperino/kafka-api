@@ -1,6 +1,11 @@
 use std::io;
-use crate::{Deserializable, err_decode_message_null, RawTaggedField, Readable};
-use crate::codec::{Decoder, Int32, Int64, Int8, NullableArray, NullableString, RawTaggedFieldList, Struct};
+
+use crate::{
+    codec::{
+        Decoder, Int32, Int64, Int8, NullableArray, NullableString, RawTaggedFieldList, Struct,
+    },
+    err_decode_message_null, Deserializable, RawTaggedField, Readable,
+};
 
 // https://github.com/aovestdipaperino/kafka-protocol-rs/blob/main/src/messages/list_offsets_request.rs
 
@@ -51,9 +56,11 @@ impl Deserializable for ListOffsetsRequest {
 impl Deserializable for ListOffsetsRequestTopic {
     fn read<B: Readable>(buf: &mut B, version: i16) -> io::Result<Self> {
         let mut res = ListOffsetsRequestTopic {
-            name: NullableString(version >= 6).decode(buf)?
+            name: NullableString(version >= 6)
+                .decode(buf)?
                 .ok_or_else(|| err_decode_message_null("name"))?,
-            partitions: NullableArray(Struct(version), version >= 6).decode(buf)?
+            partitions: NullableArray(Struct(version), version >= 6)
+                .decode(buf)?
                 .ok_or_else(|| err_decode_message_null("partitions"))?,
             ..Default::default()
         };
